@@ -13,12 +13,26 @@ public class ZoomHandler {
     private static float cachedNormalFov = 70.0F;
     private static double cachedEffectiveMagnification = ZoomMath.MIN_MAGNIFICATION;
 
+    // Other mods may mixin into Player#isScoping and end up calling back into JustZoom's CameraType#isFirstPerson mixin
+    // while a ZoomHandler query is already running, which would recurse infinitely (StackOverflowError).
+    private static boolean retrievingSpyglassScoping = false;
+
     public static boolean isZooming() {
         Minecraft minecraft = Minecraft.getInstance();
         if (getActiveZoomPreviewTarget(minecraft) != null) return true;
         if (!isZoomAvailable(minecraft)) return false;
-        boolean spyglassScoping = minecraft.player != null && minecraft.player.isScoping();
+        boolean spyglassScoping = isSpyglassScoping(minecraft);
         return ZoomInput.isActive(KeyMappings.KEY_TOGGLE_ZOOM.isDown(), spyglassScoping, shouldUseJustZoomForSpyglass());
+    }
+
+    private static boolean isSpyglassScoping(@NotNull Minecraft minecraft) {
+        if (minecraft.player == null || retrievingSpyglassScoping) return false;
+        retrievingSpyglassScoping = true;
+        try {
+            return minecraft.player.isScoping();
+        } finally {
+            retrievingSpyglassScoping = false;
+        }
     }
 
     public static boolean isKeybindZooming() {
